@@ -40,7 +40,11 @@ For the night log header "Night of Thu 28 May → morning Fri 29 May":
 
 For the night log header "Night of Fri 29 May → morning Sat 30 May":
 - Use 2026-05-29 as the base date`;
-async function parseNightLog(nightLogText, openAIApiKey) {
+async function parseNightLog(nightLogText, openAIApiKey, disableAi) {
+    if (disableAi) {
+        logger_1.logger.info('Night log AI parsing disabled, returning empty');
+        return { events: [], rawText: nightLogText };
+    }
     logger_1.logger.info('Parsing night log with AI', { length: nightLogText.length });
     try {
         const response = await fetch('https://api.openai.com/v1/chat/completions', {

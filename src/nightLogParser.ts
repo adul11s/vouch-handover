@@ -43,8 +43,14 @@ For the night log header "Night of Fri 29 May → morning Sat 30 May":
 
 export async function parseNightLog(
   nightLogText: string,
-  openAIApiKey: string
+  openAIApiKey: string,
+  disableAi?: boolean
 ): Promise<NightLogParsed> {
+  if (disableAi) {
+    logger.info('Night log AI parsing disabled, returning empty');
+    return { events: [], rawText: nightLogText };
+  }
+
   logger.info('Parsing night log with AI', { length: nightLogText.length });
 
   try {

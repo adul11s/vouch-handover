@@ -51,6 +51,7 @@ const app = (0, express_1.default)();
 app.use(express_1.default.json({ limit: '2mb' }));
 const PORT = process.env.PORT || 3000;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const DISABLE_AI = process.env.DISABLE_AI === 'true';
 // Load raw data for the demo
 const EVENTS_DATA = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/events.json'), 'utf-8'));
 // In-memory event store (production would be PostgreSQL)
@@ -66,10 +67,6 @@ function getEvents() {
 app.post('/api/handover', async (req, res) => {
     const { nightLogText, targetNight, hotelId = 'lumen-sg' } = req.body;
     const cid = logger_1.logger.newId();
-    if (!OPENAI_API_KEY) {
-        res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
-        return;
-    }
     if (!targetNight) {
         res.status(400).json({ error: 'targetNight is required (YYYY-MM-DD)' });
         return;
@@ -79,8 +76,8 @@ app.post('/api/handover', async (req, res) => {
         // 1. Start with structured events
         let allEvents = getEvents();
         // 2. If night log text provided, parse it and merge
-        if (nightLogText) {
-            const parsed = await (0, nightLogParser_1.parseNightLog)(nightLogText, OPENAI_API_KEY);
+        if (nightLogText && !DISABLE_AI) {
+            const parsed = await (0, nightLogParser_1.parseNightLog)(nightLogText, OPENAI_API_KEY, DISABLE_AI);
             const nightLogEvents = parsed.events.map((e, i) => ({
                 id: `nl_${Date.now()}_${i}`,
                 timestamp: e.timestamp,
