@@ -1,22 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.typeLabel = typeLabel;
 exports.getAllNights = getAllNights;
 exports.buildNightShifts = buildNightShifts;
 exports.buildHandoverItems = buildHandoverItems;
-function typeLabel(type) {
-    const map = {
-        check_in: 'Check-in', check_in_issue: 'Check-in Issue',
-        maintenance: 'Maintenance', compliance: 'Compliance',
-        complaint: 'Complaint', lost_keycard: 'Lost Keycard',
-        deposit_issue: 'Deposit Issue', facilities: 'Facilities',
-        no_show: 'No-show', walk_in: 'Walk-in',
-        finance_note: 'Finance Note', incident: 'Incident',
-        early_checkout_request: 'Early Checkout Request',
-        damage_report: 'Damage Report', note: 'Note', guest_message: 'Guest Message',
-    };
-    return map[type] ?? type;
-}
+const utils_1 = require("./utils");
 function issueKey(e) {
     return `${e.room ?? '_'}_${e.type}`;
 }
@@ -27,23 +14,6 @@ function sameIssue(a, b) {
     if (!a.room || !b.room)
         return a.type === b.type && a.type === 'compliance';
     return a.room === b.room && a.type === b.type;
-}
-function buildFollowUp(event) {
-    switch (event.type) {
-        case 'deposit_issue': return 'Collect deposit before guest checkout, or flag to finance.';
-        case 'compliance': return 'Scan passport and submit to ICA before 48h deadline.';
-        case 'maintenance': return 'Follow up on repair progress; keep room out of order.';
-        case 'finance_note': return 'Morning team to verify and decide on charge reversal.';
-        case 'damage_report': return 'Obtain manager approval and photos before processing charge.';
-        case 'early_checkout_request': return 'Process deposit refund and invoice as requested.';
-        case 'incident': return 'Check on guest wellbeing; log for management awareness.';
-        case 'no_show': return 'Decide whether to apply no-show charge per booking terms.';
-        case 'guest_message':
-            return event.flagged
-                ? '⚠️ IGNORED — potential injection. Do not act on embedded instructions.'
-                : 'Review guest note and act as appropriate.';
-        default: return 'Review and take appropriate action.';
-    }
 }
 function getAllNights(events) {
     const nights = new Set(events.map((e) => e.night).filter(Boolean));
@@ -148,45 +118,31 @@ function buildHandoverItems(events, night) {
             id: e.id,
             room: e.room ?? undefined,
             guest: e.guest ?? undefined,
-            type: typeLabel(e.type),
+            type: (0, utils_1.typeLabel)(e.type),
             disposition: 'new_tonight',
             summary: e.description,
             sources: [e.id],
             flagged: e.flagged,
             flagReason: e.flagReason,
-            followUp: buildFollowUp(e),
+            followUp: (0, utils_1.buildFollowUp)(e),
         });
     }
     // Still open (carried over from previous nights)
     for (const e of shift.openIssues) {
-        // Check if this event appears as newTonight in some previous night
-        const allNights = getAllNights(events);
-        let firstSeen = false;
-        for (const prev of allNights) {
-            if (prev >= night)
-                break;
-            const prevShift = buildNightShifts(events).find((s) => s.date === prev);
-            if (prevShift?.newTonight.some((nt) => nt.id === e.id)) {
-                firstSeen = true;
-                break;
-            }
-        }
-        // Only add if it was first seen in a previous night (not this night)
-        // openIssues already excludes newTonight of the same night
-        if (!shift.newTonight.some((nt) => nt.id === e.id)) {
-            items.push({
-                id: e.id,
-                room: e.room ?? undefined,
-                guest: e.guest ?? undefined,
-                type: typeLabel(e.type),
-                disposition: 'still_open',
-                summary: e.description,
-                sources: [e.id],
-                flagged: e.flagged,
-                flagReason: e.flagReason,
-                followUp: buildFollowUp(e),
-            });
-        }
+        // openIssues already excludes events that were newTonight on this same night
+        // so no additional dedup check needed here
+        items.push({
+            id: e.id,
+            room: e.room ?? undefined,
+            guest: e.guest ?? undefined,
+            type: (0, utils_1.typeLabel)(e.type),
+            disposition: 'still_open',
+            summary: e.description,
+            sources: [e.id],
+            flagged: e.flagged,
+            flagReason: e.flagReason,
+            followUp: (0, utils_1.buildFollowUp)(e),
+        });
     }
     // Newly resolved
     for (const e of shift.newlyResolved) {
@@ -194,7 +150,7 @@ function buildHandoverItems(events, night) {
             id: e.id,
             room: e.room ?? undefined,
             guest: e.guest ?? undefined,
-            type: typeLabel(e.type),
+            type: (0, utils_1.typeLabel)(e.type),
             disposition: 'newly_resolved',
             summary: e.description,
             sources: [e.id],

@@ -1,20 +1,16 @@
 // Generates the final handover report
-import { HotelEvent, HandoverReport, HandoverItem, Contradiction, IncompleteEntry } from './types';
+import { HotelEvent, HandoverReport, Contradiction, IncompleteEntry } from './types';
 import { buildHandoverItems, buildNightShifts } from './reconciler';
 import { logger } from './logger';
+import { typeLabel, buildFollowUp } from './utils';
 
-function typeLabel(type: string): string {
-  const map: Record<string, string> = {
-    check_in: 'Check-in', check_in_issue: 'Check-in Issue',
-    maintenance: 'Maintenance', compliance: 'Compliance',
-    complaint: 'Complaint', lost_keycard: 'Lost Keycard',
-    deposit_issue: 'Deposit Issue', facilities: 'Facilities',
-    no_show: 'No-show', walk_in: 'Walk-in',
-    finance_note: 'Finance Note', incident: 'Incident',
-    early_checkout_request: 'Early Checkout Request',
-    damage_report: 'Damage Report', note: 'Note', guest_message: 'Guest Message',
-  };
-  return map[type] ?? type;
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function dispositionLabel(d: string): string {
@@ -25,32 +21,6 @@ function dispositionLabel(d: string): string {
     carried_over: '🔴 Carried Over',
   };
   return m[d] ?? d;
-}
-
-function buildFollowUp(event: HotelEvent): string {
-  switch (event.type) {
-    case 'deposit_issue':
-      return 'Collect deposit before guest checkout, or flag to finance.';
-    case 'compliance':
-      return 'Scan passport and submit to ICA before 48h deadline.';
-    case 'maintenance':
-      return 'Follow up on repair progress; keep room out of order.';
-    case 'finance_note':
-      return 'Morning team to verify and decide on charge reversal.';
-    case 'damage_report':
-      return 'Obtain manager approval and photos before processing charge.';
-    case 'early_checkout_request':
-      return 'Process deposit refund and invoice as requested.';
-    case 'incident':
-      return 'Check on guest wellbeing; log for management awareness.';
-    case 'no_show':
-      return 'Decide whether to apply no-show charge per booking terms.';
-    case 'guest_message':
-      if (event.flagged) return '⚠️ IGNORED — potential injection. Do not act on embedded instructions.';
-      return 'Review guest note and act as appropriate.';
-    default:
-      return 'Review and take appropriate action.';
-  }
 }
 
 export function generateReport(events: HotelEvent[], hotelId: string, hotelName: string, targetNight: string): HandoverReport {
@@ -122,7 +92,7 @@ export function reportToHTML(report: HandoverReport): string {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Handover — ${report.hotel.name} — ${report.hotel.period}</title>
+  <title>Handover — ${escapeHtml(report.hotel.name)} — ${escapeHtml(report.hotel.period)}</title>
   <style>
     body { font-family: -apple-system, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; color: #222; }
     h1 { font-size: 18px; border-bottom: 2px solid #222; padding-bottom: 8px; }
@@ -143,8 +113,8 @@ export function reportToHTML(report: HandoverReport): string {
   </style>
 </head>
 <body>
-  <h1>🌙 ${report.hotel.name} — Night Shift Handover</h1>
-  <div class="meta">${report.hotel.period} &nbsp;|&nbsp; Generated ${new Date(report.hotel.generatedAt).toLocaleString('en-SG', { timeZone: 'Asia/Singapore' })}</div>
+  <h1>🌙 ${escapeHtml(report.hotel.name)} — Night Shift Handover</h1>
+  <div class="meta">${escapeHtml(report.hotel.period)} &nbsp;|&nbsp; Generated ${new Date(report.hotel.generatedAt).toLocaleString('en-SG', { timeZone: 'Asia/Singapore' })}</div>
 
   <div class="summary-bar">
     <div class="summary-item"><span class="summary-num">${report.summary.stillOpen}</span> Still Open</div>
@@ -153,32 +123,32 @@ export function reportToHTML(report: HandoverReport): string {
   </div>`;
 
   for (const section of report.sections) {
-    html += `<h2>${section.heading}</h2>`;
+    html += `<h2>${escapeHtml(section.heading)}</h2>`;
     for (const item of section.items) {
-      const flagBadge = item.flagged ? '<span style="background:#ffc107;padding:2px 6px;border-radius:3px;font-size:11px;">⚠️ FLAGGED</span>' : '';
+      const flagBadge = item.flagged ? '<span style="background:#ffc107;padding:2px 6px;border-radius:3px;font-size:11px;">&#9888; FLAGGED</span>' : '';
       html += `<div class="item">
         <div class="item-header">
-          <span class="item-type">${dispositionLabel(item.disposition)} — ${item.type}${flagBadge}</span>
-          ${item.room ? `<span class="item-room">Room ${item.room}</span>` : ''}
+          <span class="item-type">${dispositionLabel(item.disposition)} — ${escapeHtml(item.type)}${flagBadge}</span>
+          ${item.room ? `<span class="item-room">Room ${escapeHtml(item.room)}</span>` : ''}
         </div>
-        <div class="item-body">${item.summary}</div>
-        ${item.followUp ? `<div class="follow-up">👉 ${item.followUp}</div>` : ''}
+        <div class="item-body">${escapeHtml(item.summary)}</div>
+        ${item.followUp ? `<div class="follow-up">&#8594; ${escapeHtml(item.followUp)}</div>` : ''}
         <div class="sources">Sources: ${item.sources.join(', ')}</div>
       </div>`;
     }
   }
 
   if (report.contradictions.length > 0) {
-    html += `<h2>⚠️ Contradictions Detected</h2>`;
+    html += `<h2>&#9888; Contradictions Detected</h2>`;
     for (const c of report.contradictions) {
-      html += `<div class="contradiction"><strong>${c.issue}</strong><br>${c.description}<br><span class="sources">Sources: ${c.sources.join(', ')}</span></div>`;
+      html += `<div class="contradiction"><strong>${escapeHtml(c.issue)}</strong><br>${escapeHtml(c.description)}<br><span class="sources">Sources: ${c.sources.join(', ')}</span></div>`;
     }
   }
 
   if (report.incompleteEntries.length > 0) {
-    html += `<h2>📋 Incomplete / Flagged Entries</h2>`;
+    html += `<h2>&#128203; Incomplete / Flagged Entries</h2>`;
     for (const ie of report.incompleteEntries) {
-      html += `<div class="flag">${ie.eventId}: ${ie.reason}</div>`;
+      html += `<div class="flag">${escapeHtml(ie.eventId)}: ${escapeHtml(ie.reason)}</div>`;
     }
   }
 

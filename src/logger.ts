@@ -1,29 +1,28 @@
 import { LogEntry } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
-const correlationId = uuidv4();
-
 export function createLogger() {
-  function log(entry: Omit<LogEntry, 'timestamp' | 'correlationId'>) {
+  function log(entry: Omit<LogEntry, 'timestamp'>) {
     const full: LogEntry = {
-      ...entry,
+      level: entry.level,
       timestamp: new Date().toISOString(),
-      correlationId,
+      correlationId: entry.correlationId ?? 'unknown',
+      message: entry.message,
+      context: entry.context,
     };
-    // Structured JSON to stdout — can be piped to Datadog/Splunk
     console.log(JSON.stringify(full));
   }
 
   return {
-    info: (message: string, context?: Record<string, unknown>) =>
-      log({ level: 'info', message, context }),
-    warn: (message: string, context?: Record<string, unknown>) =>
-      log({ level: 'warn', message, context }),
-    error: (message: string, context?: Record<string, unknown>) =>
-      log({ level: 'error', message, context }),
-    debug: (message: string, context?: Record<string, unknown>) =>
-      log({ level: 'debug', message, context }),
-    correlationId,
+    info: (message: string, context?: Record<string, unknown>, correlationId?: string) =>
+      log({ level: 'info', message, correlationId: correlationId ?? 'unknown', context }),
+    warn: (message: string, context?: Record<string, unknown>, correlationId?: string) =>
+      log({ level: 'warn', message, correlationId: correlationId ?? 'unknown', context }),
+    error: (message: string, context?: Record<string, unknown>, correlationId?: string) =>
+      log({ level: 'error', message, correlationId: correlationId ?? 'unknown', context }),
+    debug: (message: string, context?: Record<string, unknown>, correlationId?: string) =>
+      log({ level: 'debug', message, correlationId: correlationId ?? 'unknown', context }),
+    newId: () => uuidv4(),
   };
 }
 

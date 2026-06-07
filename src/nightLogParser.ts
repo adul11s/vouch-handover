@@ -84,49 +84,25 @@ export async function parseNightLog(
       throw new Error('No JSON found in AI response');
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    let parsed: { events?: unknown[] };
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch {
+      throw new Error('AI response was not valid JSON');
+    }
 
     return {
-      events: parsed.events ?? [],
+      events: (parsed.events ?? []) as Omit<HotelEvent, 'id' | 'source'>[],
       rawText: nightLogText,
     };
   } catch (err) {
-    logger.warn('Night log parsing failed, falling back to manual parse', { error: String(err) });
-    return manualParseNightLog(nightLogText);
+    logger.error('Night log parsing failed', { error: String(err) });
+    throw new Error(`Night log AI parsing failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
-function manualParseNightLog(text: string): NightLogParsed {
-  const events: Omit<HotelEvent, 'id' | 'source'>[] = [];
-
-  const headerMatch = text.match(/Night of (\w+) (\d+) (\w+) → morning (\w+) (\d+) (\w+)/);
-  if (!headerMatch) {
-    return { events, rawText: text };
-  }
-
-  if (text.includes('aircon') || text.includes('maintenance')) {
-    events.push({
-      timestamp: '2026-05-27T00:00:00+08:00',
-      type: 'maintenance',
-      room: '112',
-      guest: null,
-      description: 'Aircon compressor issue — part ordered, room stays out of order.',
-      status: 'unresolved',
-      flagged: false,
-    });
-  }
-
-  if (text.includes('leak') || text.includes('corridor')) {
-    events.push({
-      timestamp: '2026-05-27T00:00:00+08:00',
-      type: 'facilities',
-      room: null,
-      guest: null,
-      description: 'Water leak in 2nd floor corridor near room 215 — carpet soaked, bucket placed, building management called but did not attend.',
-      status: 'unresolved',
-      flagged: false,
-    });
-  }
-
-  return { events, rawText: text };
+export function manualParseNightLog(_text: string): NightLogParsed {
+  // Manual fallback intentionally returns empty — if AI parsing fails, we must
+  // propagate the error rather than silently serve fabricated data.
+  return { events: [], rawText: _text };
 }

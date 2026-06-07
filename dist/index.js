@@ -39,6 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const dotenv = __importStar(require("dotenv"));
 const dataLoader_1 = require("./dataLoader");
+const utils_1 = require("./utils");
 const nightLogParser_1 = require("./nightLogParser");
 const reportBuilder_1 = require("./reportBuilder");
 const reconciler_1 = require("./reconciler");
@@ -64,6 +65,7 @@ function getEvents() {
 // Body: { nightLogText?: string, targetNight?: string, hotelId?: string }
 app.post('/api/handover', async (req, res) => {
     const { nightLogText, targetNight, hotelId = 'lumen-sg' } = req.body;
+    const cid = logger_1.logger.newId();
     if (!OPENAI_API_KEY) {
         res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
         return;
@@ -72,7 +74,7 @@ app.post('/api/handover', async (req, res) => {
         res.status(400).json({ error: 'targetNight is required (YYYY-MM-DD)' });
         return;
     }
-    logger_1.logger.info('Handover request received', { hotelId, targetNight });
+    logger_1.logger.info('Handover request received', { hotelId, targetNight }, cid);
     try {
         // 1. Start with structured events
         let allEvents = getEvents();
@@ -88,7 +90,7 @@ app.post('/api/handover', async (req, res) => {
                 description: e.description,
                 status: e.status,
                 source: 'night_log',
-                night: deriveNightDate(e.timestamp),
+                night: (0, utils_1.deriveNightDate)(e.timestamp),
                 flagged: e.flagged ?? false,
                 flagReason: e.flagReason,
             }));
@@ -103,34 +105,38 @@ app.post('/api/handover', async (req, res) => {
             targetNight,
             issues: report.summary.totalIssues,
             contradictions: report.contradictions.length,
-        });
+        }, cid);
         res.json(report);
     }
     catch (err) {
-        logger_1.logger.error('Handover generation failed', { error: String(err) });
+        logger_1.logger.error('Handover generation failed', { error: String(err) }, cid);
         res.status(500).json({ error: 'Handover generation failed', details: String(err) });
     }
 });
-// GET /api/handover?night=YYYY-MM-DD — JSON output
+// GET /api/handover?night=YYYY-MM-DD&hotelId=lumen-sg — JSON output
 app.get('/api/handover', async (req, res) => {
     const targetNight = req.query.night;
+    const hotelId = req.query.hotelId || 'lumen-sg';
     if (!targetNight) {
         res.status(400).json({ error: 'night query param required (YYYY-MM-DD)' });
         return;
     }
+    const cid = logger_1.logger.newId();
     const events = getEvents();
-    const report = (0, reportBuilder_1.generateReport)(events, 'lumen-sg', EVENTS_DATA.hotel.name, targetNight);
+    const report = (0, reportBuilder_1.generateReport)(events, hotelId, EVENTS_DATA.hotel.name, targetNight);
     res.json(report);
 });
-// GET /api/handover.html?night=YYYY-MM-DD — HTML output
+// GET /api/handover.html?night=YYYY-MM-DD&hotelId=lumen-sg — HTML output
 app.get('/api/handover.html', async (req, res) => {
     const targetNight = req.query.night;
+    const hotelId = req.query.hotelId || 'lumen-sg';
     if (!targetNight) {
         res.status(400).send('night query param required (YYYY-MM-DD)');
         return;
     }
+    const cid = logger_1.logger.newId();
     const events = getEvents();
-    const report = (0, reportBuilder_1.generateReport)(events, 'lumen-sg', EVENTS_DATA.hotel.name, targetNight);
+    const report = (0, reportBuilder_1.generateReport)(events, hotelId, EVENTS_DATA.hotel.name, targetNight);
     const html = (0, reportBuilder_1.reportToHTML)(report);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
@@ -157,17 +163,6 @@ app.get('/api/events', (req, res) => {
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
-function deriveNightDate(timestamp) {
-    const localHour = parseInt(timestamp.split('T')[1].slice(0, 2), 10);
-    if (localHour >= 23) {
-        return timestamp.split('T')[0];
-    }
-    else {
-        const prev = new Date(timestamp);
-        prev.setDate(prev.getDate() - 1);
-        return prev.toISOString().split('T')[0];
-    }
-}
 app.listen(PORT, () => {
     logger_1.logger.info(`Vouch Handover service running on port ${PORT}`);
 });

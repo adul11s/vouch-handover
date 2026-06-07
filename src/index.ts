@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import * as dotenv from 'dotenv';
-import { loadAllEvents, normalizeStructuredEvents, NightLogParsed } from './dataLoader';
+import { normalizeStructuredEvents, NightLogParsed } from './dataLoader';
+import { deriveNightDate } from './utils';
 import { parseNightLog } from './nightLogParser';
 import { generateReport, reportToHTML } from './reportBuilder';
 import { buildNightShifts, getAllNights } from './reconciler';
@@ -36,6 +37,7 @@ function getEvents() {
 // Body: { nightLogText?: string, targetNight?: string, hotelId?: string }
 app.post('/api/handover', async (req, res) => {
   const { nightLogText, targetNight, hotelId = 'lumen-sg' } = req.body;
+  const cid = logger.newId();
 
   if (!OPENAI_API_KEY) {
     res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
@@ -47,7 +49,7 @@ app.post('/api/handover', async (req, res) => {
     return;
   }
 
-  logger.info('Handover request received', { hotelId, targetNight });
+  logger.info('Handover request received', { hotelId, targetNight }, cid);
 
   try {
     // 1. Start with structured events
@@ -83,38 +85,42 @@ app.post('/api/handover', async (req, res) => {
       targetNight,
       issues: report.summary.totalIssues,
       contradictions: report.contradictions.length,
-    });
+    }, cid);
 
     res.json(report);
   } catch (err) {
-    logger.error('Handover generation failed', { error: String(err) });
+    logger.error('Handover generation failed', { error: String(err) }, cid);
     res.status(500).json({ error: 'Handover generation failed', details: String(err) });
   }
 });
 
-// GET /api/handover?night=YYYY-MM-DD — JSON output
+// GET /api/handover?night=YYYY-MM-DD&hotelId=lumen-sg — JSON output
 app.get('/api/handover', async (req, res) => {
   const targetNight = req.query.night as string;
+  const hotelId = (req.query.hotelId as string) || 'lumen-sg';
   if (!targetNight) {
     res.status(400).json({ error: 'night query param required (YYYY-MM-DD)' });
     return;
   }
 
+  const cid = logger.newId();
   const events = getEvents();
-  const report = generateReport(events, 'lumen-sg', EVENTS_DATA.hotel.name, targetNight);
+  const report = generateReport(events, hotelId, EVENTS_DATA.hotel.name, targetNight);
   res.json(report);
 });
 
-// GET /api/handover.html?night=YYYY-MM-DD — HTML output
+// GET /api/handover.html?night=YYYY-MM-DD&hotelId=lumen-sg — HTML output
 app.get('/api/handover.html', async (req, res) => {
   const targetNight = req.query.night as string;
+  const hotelId = (req.query.hotelId as string) || 'lumen-sg';
   if (!targetNight) {
     res.status(400).send('night query param required (YYYY-MM-DD)');
     return;
   }
 
+  const cid = logger.newId();
   const events = getEvents();
-  const report = generateReport(events, 'lumen-sg', EVENTS_DATA.hotel.name, targetNight);
+  const report = generateReport(events, hotelId, EVENTS_DATA.hotel.name, targetNight);
   const html = reportToHTML(report);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);
@@ -144,17 +150,6 @@ app.get('/api/events', (req, res) => {
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
-
-function deriveNightDate(timestamp: string): string {
-  const localHour = parseInt(timestamp.split('T')[1].slice(0, 2), 10);
-  if (localHour >= 23) {
-    return timestamp.split('T')[0];
-  } else {
-    const prev = new Date(timestamp);
-    prev.setDate(prev.getDate() - 1);
-    return prev.toISOString().split('T')[0];
-  }
-}
 
 app.listen(PORT, () => {
   logger.info(`Vouch Handover service running on port ${PORT}`);
