@@ -124,6 +124,7 @@ app.get('/api/handover', async (req, res) => {
     const cid = logger_1.logger.newId();
     const events = getEvents();
     const report = (0, reportBuilder_1.generateReport)(events, hotelId, EVENTS_DATA.hotel.name, targetNight);
+    logger_1.logger.info('Handover report built', { hotelId, targetNight, issues: report.summary.totalIssues }, cid);
     res.json(report);
 });
 // GET /api/handover.html?night=YYYY-MM-DD&hotelId=lumen-sg — HTML output
@@ -137,6 +138,7 @@ app.get('/api/handover.html', async (req, res) => {
     const cid = logger_1.logger.newId();
     const events = getEvents();
     const report = (0, reportBuilder_1.generateReport)(events, hotelId, EVENTS_DATA.hotel.name, targetNight);
+    logger_1.logger.info('Handover report built', { hotelId, targetNight, issues: report.summary.totalIssues }, cid);
     const html = (0, reportBuilder_1.reportToHTML)(report);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(html);

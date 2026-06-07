@@ -2,7 +2,7 @@
 import { HotelEvent, HandoverReport, Contradiction, IncompleteEntry } from './types';
 import { buildHandoverItems, buildNightShifts } from './reconciler';
 import { logger } from './logger';
-import { typeLabel, buildFollowUp } from './utils';
+import { buildFollowUp } from './utils';
 
 function escapeHtml(s: string): string {
   return s
@@ -34,7 +34,6 @@ export function generateReport(events: HotelEvent[], hotelId: string, hotelName:
   const stillOpen = items.filter(i => i.disposition === 'still_open' || i.disposition === 'carried_over');
   const newTonight = items.filter(i => i.disposition === 'new_tonight');
   const newlyResolved = items.filter(i => i.disposition === 'newly_resolved');
-  const flaggedItems = items.filter(i => i.flagged);
 
   const sections = [
     {

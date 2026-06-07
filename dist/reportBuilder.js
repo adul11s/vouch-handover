@@ -30,7 +30,6 @@ function generateReport(events, hotelId, hotelName, targetNight) {
     const stillOpen = items.filter(i => i.disposition === 'still_open' || i.disposition === 'carried_over');
     const newTonight = items.filter(i => i.disposition === 'new_tonight');
     const newlyResolved = items.filter(i => i.disposition === 'newly_resolved');
-    const flaggedItems = items.filter(i => i.flagged);
     const sections = [
         {
             heading: '🚨 On Fire — Needs Immediate Attention',

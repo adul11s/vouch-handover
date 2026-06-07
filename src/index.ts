@@ -106,6 +106,7 @@ app.get('/api/handover', async (req, res) => {
   const cid = logger.newId();
   const events = getEvents();
   const report = generateReport(events, hotelId, EVENTS_DATA.hotel.name, targetNight);
+  logger.info('Handover report built', { hotelId, targetNight, issues: report.summary.totalIssues }, cid);
   res.json(report);
 });
 
@@ -121,6 +122,7 @@ app.get('/api/handover.html', async (req, res) => {
   const cid = logger.newId();
   const events = getEvents();
   const report = generateReport(events, hotelId, EVENTS_DATA.hotel.name, targetNight);
+  logger.info('Handover report built', { hotelId, targetNight, issues: report.summary.totalIssues }, cid);
   const html = reportToHTML(report);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);
