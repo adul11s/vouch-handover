@@ -1,5 +1,7 @@
 # Vouch Night-Shift Handover Service
 
+[![CI](https://github.com/adul11s/vouch-handover/actions/workflows/ci.yml/badge.svg)](https://github.com/adul11s/vouch-handover/actions/workflows/ci.yml)
+
 Generates action-first night-shift handover reports for hotel morning managers.
 
 ## Quick start
@@ -60,3 +62,11 @@ The service is a stateless Node.js server. Deploy anywhere that runs Node.js (Ra
 docker build -t vouch-handover .
 docker run -p 3000:3000 -e OPENAI_API_KEY=$OPENAI_API_KEY vouch-handover
 ```
+## Known gaps
+
+- Satu bug data-loss pada kasus reopened issue ditemukan dan didokumentasikan,
+  belum diperbaiki (lihat `docs/quality-scorecard.md`).
+- Demo data sintetis; tidak ada video demo.
+- Biaya/latensi per request AI belum diukur (TODO, perlu API key saat runtime).
+- Room-specific "contradiction 312" masih hardcode; logger `correlationId`
+  sering `unknown`.
