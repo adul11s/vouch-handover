@@ -61,6 +61,38 @@ describe('reconciler — still open across nights', () => {
   });
 });
 
+describe('reconciler — reopened issue after resolution (f08 regression)', () => {
+  it('an issue resolved night B that re-occurs night C appears as new_tonight, not missing', () => {
+    // Data-loss regression: previously the reopened issue vanished entirely —
+    // the open thread was deleted on resolution AND seenBefore excluded the
+    // recurring key, so no handover item was produced at all (eval FN, f08).
+    const events = [
+      ev({ id: 'e1', timestamp: '2026-05-28T23:30:00+08:00', type: 'maintenance', room: '112', description: 'Aircon not cooling', status: 'unresolved' }),
+      ev({ id: 'e2', timestamp: '2026-05-29T23:30:00+08:00', type: 'maintenance', room: '112', description: 'Aircon repaired', status: 'resolved' }),
+      ev({ id: 'e3', timestamp: '2026-05-31T23:30:00+08:00', type: 'maintenance', room: '112', description: 'Aircon failed again', status: 'unresolved' }),
+    ];
+    const nightB = buildHandoverItems(events, '2026-05-29');
+    expect(nightB.map((i) => i.disposition)).toEqual(['newly_resolved']);
+    expect(nightB.some((i) => i.disposition === 'still_open')).toBe(false);
+
+    const nightC = buildHandoverItems(events, '2026-05-31');
+    expect(nightC).toHaveLength(1);
+    expect(nightC[0]).toMatchObject({ disposition: 'new_tonight', sources: expect.arrayContaining(['e3']) });
+    // The reopened item must not collide with the closed thread as still_open
+    expect(nightC.some((i) => i.disposition === 'still_open')).toBe(false);
+  });
+
+  it('a key never resolved stays excluded from new_tonight (no false reopen)', () => {
+    const events = [
+      ev({ id: 'e1', timestamp: '2026-05-29T23:30:00+08:00', type: 'compliance', room: '204', description: 'Passport not scanned', status: 'unresolved' }),
+      ev({ id: 'e2', timestamp: '2026-05-30T23:30:00+08:00', type: 'compliance', room: '204', description: 'Still not scanned', status: 'unresolved' }),
+    ];
+    const items = buildHandoverItems(events, '2026-05-30');
+    expect(items).toHaveLength(1);
+    expect(items[0].disposition).toBe('still_open');
+  });
+});
+
 describe('reconciler — newly resolved closes the thread', () => {
   it('reports newly_resolved when a carried-over issue is resolved on a later night', () => {
     const events = [

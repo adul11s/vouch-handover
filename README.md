@@ -59,13 +59,14 @@ The service is a stateless Node.js server. Deploy anywhere that runs Node.js (Ra
 
 ```bash
 # Docker (optional)
+# ⚠️ UNTESTED — the Dockerfile was written for this simple Node service but has
+# not been executed/verified (no Docker daemon on the authoring machine). The
+# verified path is npm run build && npm start.
 docker build -t vouch-handover .
 docker run -p 3000:3000 -e OPENAI_API_KEY=$OPENAI_API_KEY vouch-handover
 ```
 ## Known gaps
 
-- Satu bug data-loss pada kasus reopened issue ditemukan dan didokumentasikan,
-  belum diperbaiki (lihat `docs/quality-scorecard.md`).
 - Demo data sintetis; tidak ada video demo.
 - Biaya/latensi per request AI belum diukur (TODO, perlu API key saat runtime).
 - Room-specific "contradiction 312" masih hardcode; logger `correlationId`

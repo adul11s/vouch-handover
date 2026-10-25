@@ -26,6 +26,12 @@ export function buildNightShifts(events: HotelEvent[]): NightShift[] {
   // Running registry: maps issueKey → event that has the open thread
   // Tracks unresolved events from ALL previous nights, keyed by room+type
   const openThreads = new Map<string, HotelEvent>();
+  // Minimal status bookkeeping for reopening: keys whose thread was closed by an
+  // earlier-night resolution. A key in here that re-occurs later must NOT be
+  // swallowed by the seenBefore exclusion — it re-enters as new_tonight so the
+  // morning manager actually sees the reopened issue (was a data-loss bug:
+  // reopened issue vanished entirely after resolution, fixture f08).
+  const closedThreads = new Set<string>();
 
   for (const night of nights) {
     const nightEvents = events.filter((e) => e.night === night);
@@ -53,6 +59,9 @@ export function buildNightShifts(events: HotelEvent[]): NightShift[] {
     // Update running registry
     for (const e of newlyResolved) {
       openThreads.delete(issueKey(e));
+      // Remember the closure so a later recurrence is treated as a reopen
+      // (new_tonight) instead of being silently dropped by seenBefore below.
+      closedThreads.add(issueKey(e));
     }
     for (const e of newUnresolved) {
       openThreads.set(issueKey(e), e);
@@ -66,7 +75,14 @@ export function buildNightShifts(events: HotelEvent[]): NightShift[] {
     );
     const newTonight = nightEvents.filter((e) => {
       if (e.status === 'resolved') return false;
-      return !seenBefore.has(issueKey(e));
+      const key = issueKey(e);
+      if (seenBefore.has(key)) {
+        // Reopen: thread on this key was already closed by an earlier resolution,
+        // so this recurrence is a fresh open the manager must see — not a dup
+        // of a still-open item (those keys are still in openThreads, not here).
+        return closedThreads.has(key);
+      }
+      return true;
     });
 
     // Contradictions
