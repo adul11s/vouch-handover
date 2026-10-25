@@ -80,9 +80,9 @@ export function generateReport(events: HotelEvent[], hotelId: string, hotelName:
 }
 
 function nextDay(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00+08:00');
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().split('T')[0];
+  // Pure-calendar arithmetic: parse as UTC midnight and add one day's ms
+  const d = new Date(dateStr + 'T00:00:00Z');
+  return new Date(d.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 }
 
 // Convert to HTML for human-readable view
